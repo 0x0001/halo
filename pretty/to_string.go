@@ -93,7 +93,6 @@ func fromSliceStruct(v interface{}, ignoreFieldNames ...string) string {
 			row = append(row, val)
 		}
 		w.AppendRow(table.Row(row))
-		w.AppendSeparator()
 	}
 	return w.Render()
 }
@@ -137,7 +136,6 @@ func fromSliceMap(v interface{}, ignoreFieldNames ...string) string {
 			}
 		}
 		w.AppendRow(table.Row(row))
-		w.AppendSeparator()
 	}
 	return w.Render()
 }
@@ -182,7 +180,6 @@ func fromMap(v interface{}, ignoreFieldNames ...string) string {
 		}
 	}
 	w.AppendRow(table.Row(row))
-	w.AppendSeparator()
 	return w.Render()
 }
 
@@ -207,6 +204,5 @@ func fromStruct(v interface{}, ignoreFieldNames ...string) string {
 		row = append(row, ToString(field.Interface()))
 	}
 	w.AppendRow(table.Row(row))
-	w.AppendSeparator()
 	return w.Render()
 }
