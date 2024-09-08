@@ -9,6 +9,7 @@ import (
 
 	"github.com/jedib0t/go-pretty/v6/list"
 	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/jedib0t/go-pretty/v6/text"
 )
 
 func ToString(v interface{}, ignoreFieldNames ...string) (string, error) {
@@ -72,7 +73,6 @@ func fromSliceStruct(v interface{}, ignoreFieldNames ...string) (string, error) 
 	value := reflect.ValueOf(v)
 	t := value.Type().Elem()
 
-	// ptr := t.Kind() == reflect.Ptr
 	for t.Kind() == reflect.Ptr {
 		t = t.Elem()
 		value = value.Elem()
@@ -162,7 +162,6 @@ func fromMap(v interface{}, ignoreFieldNames ...string) (string, error) {
 	}
 	value := reflect.ValueOf(v)
 
-	w := table.NewWriter()
 	if value.IsNil() || value.IsZero() {
 		return "", nil
 	}
@@ -183,22 +182,21 @@ func fromMap(v interface{}, ignoreFieldNames ...string) (string, error) {
 		return strings.Compare(a.(string), b.(string))
 	})
 
-	w.AppendHeader(table.Row(names))
+	w := table.NewWriter()
+	w.SetColumnConfigs([]table.ColumnConfig{
+		{Number: 1, Align: text.AlignRight},
+	})
 
-	row := make([]any, 0, len(names))
 	for _, key := range names {
 		v_ := value.MapIndex(reflect.ValueOf(key))
-		if v_.Kind() == 0 {
-			row = append(row, "")
-		} else {
+		if v_.Kind() != 0 {
 			if vv, err := ToString(v_.Interface()); err != nil {
 				return "", err
 			} else {
-				row = append(row, vv)
+				w.AppendRow(table.Row{key, vv})
 			}
 		}
 	}
-	w.AppendRow(table.Row(row))
 	return w.Render(), nil
 }
 
@@ -209,7 +207,6 @@ func fromStruct(v interface{}, ignoreFieldNames ...string) (string, error) {
 		return value.Interface().(time.Time).Format(time.RFC3339), nil
 	}
 
-	w := table.NewWriter()
 	names := make([]any, 0, t.NumField())
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
@@ -219,21 +216,21 @@ func fromStruct(v interface{}, ignoreFieldNames ...string) (string, error) {
 		}
 		names = append(names, t.Field(i).Name)
 	}
-	w.AppendHeader(table.Row(names))
 
-	row := make([]any, 0, len(names))
+	w := table.NewWriter()
+	w.SetColumnConfigs([]table.ColumnConfig{
+		{Number: 1, Align: text.AlignRight},
+	})
+
 	for _, fieldName := range names {
 		field := value.FieldByName(fieldName.(string))
 		if field.CanInterface() {
 			if vv, err := ToString(field.Interface()); err != nil {
 				return "", err
 			} else {
-				row = append(row, vv)
+				w.AppendRow(table.Row{fieldName, vv})
 			}
-		} else {
-			row = append(row, "")
 		}
 	}
-	w.AppendRow(table.Row(row))
 	return w.Render(), nil
 }
