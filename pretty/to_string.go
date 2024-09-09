@@ -13,6 +13,12 @@ import (
 )
 
 func ToString(v interface{}, ignoreFieldNames ...string) (string, error) {
+	if t, ok := v.(time.Time); ok {
+		return t.Format(time.RFC3339), nil
+	}
+	if v == nil {
+		return "<nil>", nil
+	}
 	t := reflect.TypeOf(v)
 	switch t.Kind() {
 	case reflect.Slice:
@@ -25,14 +31,12 @@ func ToString(v interface{}, ignoreFieldNames ...string) (string, error) {
 		return fromStruct(v, ignoreFieldNames...)
 	case reflect.Ptr:
 		v_ := reflect.ValueOf(v)
-		return ToString(v_.Elem().Interface(), ignoreFieldNames...)
-	default:
-		switch v.(type) {
-		case time.Time:
-			return v.(time.Time).Format(time.RFC3339), nil
-		default:
-			return fmt.Sprintf("%v", v), nil
+		if v_.IsValid() && !v_.IsNil() {
+			return ToString(v_.Elem().Interface(), ignoreFieldNames...)
 		}
+		return fmt.Sprintf("%v", v), nil
+	default:
+		return fmt.Sprintf("%v", v), nil
 	}
 }
 
@@ -81,21 +85,21 @@ func fromSliceStruct(v interface{}, ignoreFieldNames ...string) (string, error) 
 	names := make([]any, 0, t.NumField())
 	for i := 0; i < t.NumField(); i++ {
 		name := t.Field(i).Name
-		if slices.ContainsFunc(ignoreFieldNames, func(v string) bool { return strings.EqualFold(v, name) }) {
+		if containsIgnoreCase(ignoreFieldNames, name) {
 			continue
 		}
 		names = append(names, t.Field(i).Name)
 	}
-	w.AppendHeader(table.Row(names))
+	w.AppendHeader(names)
 
 	for i := 0; i < value.Len(); i++ {
 		row := make([]any, 0, t.NumField())
 		for _, fieldName := range names {
-			v := value.Index(i)
-			for v.Kind() == reflect.Ptr {
-				v = v.Elem()
+			vv := value.Index(i)
+			for vv.Kind() == reflect.Ptr {
+				vv = vv.Elem()
 			}
-			field := v.FieldByName(fieldName.(string))
+			field := vv.FieldByName(fieldName.(string))
 			var val any
 
 			if field.Kind() == reflect.Slice {
@@ -107,9 +111,13 @@ func fromSliceStruct(v interface{}, ignoreFieldNames ...string) (string, error) 
 			} else {
 				val = field.Interface()
 			}
-			row = append(row, val)
+			rv, err := ToString(val, ignoreFieldNames...)
+			if err != nil {
+				return "", err
+			}
+			row = append(row, rv)
 		}
-		w.AppendRow(table.Row(row))
+		w.AppendRow(row)
 	}
 	return w.Render(), nil
 }
@@ -118,14 +126,15 @@ func fromSliceMap(v interface{}, ignoreFieldNames ...string) (string, error) {
 	value := reflect.ValueOf(v)
 
 	w := table.NewWriter()
-	if value.IsNil() || value.IsZero() {
+	if !value.IsValid() || value.Len() == 0 {
 		return "", nil
 	}
+
 	allKeys := make(map[string]struct{})
 	for i := 0; i < value.Len(); i++ {
 		for _, key := range value.Index(i).MapKeys() {
 			name := key.String()
-			if slices.ContainsFunc(ignoreFieldNames, func(v string) bool { return strings.EqualFold(v, name) }) {
+			if containsIgnoreCase(ignoreFieldNames, name) {
 				continue
 			}
 			allKeys[key.String()] = struct{}{}
@@ -140,19 +149,19 @@ func fromSliceMap(v interface{}, ignoreFieldNames ...string) (string, error) {
 		return strings.Compare(a.(string), b.(string))
 	})
 
-	w.AppendHeader(table.Row(names))
+	w.AppendHeader(names)
 
 	for i := 0; i < value.Len(); i++ {
 		row := make([]any, 0, len(names))
 		for _, key := range names {
 			v_ := value.Index(i).MapIndex(reflect.ValueOf(key))
-			if v_.Kind() == 0 {
-				row = append(row, "")
+			if !v_.IsValid() {
+				row = append(row, "<nil>")
 			} else {
 				row = append(row, v_.Interface())
 			}
 		}
-		w.AppendRow(table.Row(row))
+		w.AppendRow(row)
 	}
 	return w.Render(), nil
 }
@@ -167,13 +176,13 @@ func fromMap(v interface{}, ignoreFieldNames ...string) (string, error) {
 	if value.IsNil() || value.IsZero() {
 		return "", nil
 	}
-	allKeys := make(map[string]struct{})
+	allKeys := make(map[interface{}]struct{})
 	for _, key := range value.MapKeys() {
-		name := key.String()
-		if slices.ContainsFunc(ignoreFieldNames, func(v string) bool { return strings.EqualFold(v, name) }) {
+		name := fmt.Sprintf("%v", key.Interface())
+		if containsIgnoreCase(ignoreFieldNames, name) {
 			continue
 		}
-		allKeys[key.String()] = struct{}{}
+		allKeys[key.Interface()] = struct{}{}
 	}
 
 	names := make([]any, 0, len(allKeys))
@@ -181,7 +190,9 @@ func fromMap(v interface{}, ignoreFieldNames ...string) (string, error) {
 		names = append(names, key)
 	}
 	slices.SortFunc(names, func(a, b any) int {
-		return strings.Compare(a.(string), b.(string))
+		keyA := fmt.Sprintf("%v", a)
+		keyB := fmt.Sprintf("%v", b)
+		return strings.Compare(keyA, keyB)
 	})
 
 	w := table.NewWriter()
@@ -191,7 +202,7 @@ func fromMap(v interface{}, ignoreFieldNames ...string) (string, error) {
 
 	for _, key := range names {
 		v_ := value.MapIndex(reflect.ValueOf(key))
-		if v_.Kind() != 0 {
+		if v_.IsValid() {
 			if vv, err := ToString(v_.Interface()); err != nil {
 				return "", err
 			} else {
@@ -205,15 +216,12 @@ func fromMap(v interface{}, ignoreFieldNames ...string) (string, error) {
 func fromStruct(v interface{}, ignoreFieldNames ...string) (string, error) {
 	value := reflect.ValueOf(v)
 	t := value.Type()
-	if t == reflect.TypeOf(time.Time{}) {
-		return value.Interface().(time.Time).Format(time.RFC3339), nil
-	}
 
 	names := make([]any, 0, t.NumField())
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
 		name := f.Name
-		if slices.ContainsFunc(ignoreFieldNames, func(v string) bool { return strings.EqualFold(v, name) }) {
+		if containsIgnoreCase(ignoreFieldNames, name) {
 			continue
 		}
 		names = append(names, t.Field(i).Name)
@@ -235,4 +243,13 @@ func fromStruct(v interface{}, ignoreFieldNames ...string) (string, error) {
 		}
 	}
 	return w.Render(), nil
+}
+
+func containsIgnoreCase(slice []string, str string) bool {
+	for _, s := range slice {
+		if strings.EqualFold(s, str) {
+			return true
+		}
+	}
+	return false
 }
