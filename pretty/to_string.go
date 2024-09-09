@@ -75,7 +75,6 @@ func fromSliceStruct(v interface{}, ignoreFieldNames ...string) (string, error) 
 
 	for t.Kind() == reflect.Ptr {
 		t = t.Elem()
-		value = value.Elem()
 	}
 
 	w := table.NewWriter()
@@ -93,6 +92,9 @@ func fromSliceStruct(v interface{}, ignoreFieldNames ...string) (string, error) 
 		row := make([]any, 0, t.NumField())
 		for _, fieldName := range names {
 			v := value.Index(i)
+			for v.Kind() == reflect.Ptr {
+				v = v.Elem()
+			}
 			field := v.FieldByName(fieldName.(string))
 			var val any
 
