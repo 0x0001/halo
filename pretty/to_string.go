@@ -1,6 +1,7 @@
 package pretty
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"slices"
@@ -13,12 +14,17 @@ import (
 )
 
 func ToString(v interface{}, ignoreFieldNames ...string) (string, error) {
-	if t, ok := v.(time.Time); ok {
-		return t.Format(time.RFC3339), nil
-	}
 	if v == nil {
 		return "<nil>", nil
 	}
+
+	switch v.(type) {
+	case time.Time:
+		return v.(time.Time).Format(time.RFC3339), nil
+	case json.RawMessage:
+		return string(v.(json.RawMessage)), nil
+	}
+
 	t := reflect.TypeOf(v)
 	switch t.Kind() {
 	case reflect.Slice:

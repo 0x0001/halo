@@ -1,6 +1,7 @@
 package pretty
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"testing"
@@ -365,4 +366,12 @@ func (t *toStringTest) TestIntMap() {
 	s, err = ToString(pv)
 	t.NoError(err)
 	t.Equal(w.Render(), s)
+}
+
+func (t *toStringTest) TestJsonRawMessage() {
+	var v json.RawMessage = []byte(`{"a":1,"b":"hello"}`)
+
+	s, err := ToString(v)
+	t.NoError(err)
+	t.Equal(string(v), s)
 }
