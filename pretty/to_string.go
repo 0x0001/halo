@@ -13,7 +13,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/text"
 )
 
-func ToString(v interface{}, ignoreFieldNames ...string) (string, error) {
+func ToString(v any, ignoreFieldNames ...string) (string, error) {
 	if v == nil {
 		return "<nil>", nil
 	}
@@ -35,7 +35,7 @@ func ToString(v interface{}, ignoreFieldNames ...string) (string, error) {
 		return fromMap(v, ignoreFieldNames...)
 	case reflect.Struct:
 		return fromStruct(v, ignoreFieldNames...)
-	case reflect.Ptr:
+	case reflect.Pointer:
 		v_ := reflect.ValueOf(v)
 		if v_.IsValid() && !v_.IsNil() {
 			return ToString(v_.Elem().Interface(), ignoreFieldNames...)
@@ -46,7 +46,7 @@ func ToString(v interface{}, ignoreFieldNames ...string) (string, error) {
 	}
 }
 
-func fromSlice(v interface{}, ignoreFieldNames ...string) (string, error) {
+func fromSlice(v any, ignoreFieldNames ...string) (string, error) {
 	t := reflect.TypeOf(v)
 	if t.Kind() != reflect.Slice {
 		return "", fmt.Errorf("not slice")
@@ -54,7 +54,7 @@ func fromSlice(v interface{}, ignoreFieldNames ...string) (string, error) {
 	value := reflect.ValueOf(v)
 
 	t = t.Elem()
-	for t.Kind() == reflect.Ptr {
+	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
 	switch t.Kind() {
@@ -79,11 +79,11 @@ func fromSlice(v interface{}, ignoreFieldNames ...string) (string, error) {
 	}
 }
 
-func fromSliceStruct(v interface{}, ignoreFieldNames ...string) (string, error) {
+func fromSliceStruct(v any, ignoreFieldNames ...string) (string, error) {
 	value := reflect.ValueOf(v)
 	t := value.Type().Elem()
 
-	for t.Kind() == reflect.Ptr {
+	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
 
@@ -102,7 +102,7 @@ func fromSliceStruct(v interface{}, ignoreFieldNames ...string) (string, error) 
 		row := make([]any, 0, t.NumField())
 		for _, fieldName := range names {
 			vv := value.Index(i)
-			for vv.Kind() == reflect.Ptr {
+			for vv.Kind() == reflect.Pointer {
 				vv = vv.Elem()
 			}
 			field := vv.FieldByName(fieldName.(string))
@@ -128,7 +128,7 @@ func fromSliceStruct(v interface{}, ignoreFieldNames ...string) (string, error) 
 	return w.Render(), nil
 }
 
-func fromSliceMap(v interface{}, ignoreFieldNames ...string) (string, error) {
+func fromSliceMap(v any, ignoreFieldNames ...string) (string, error) {
 	value := reflect.ValueOf(v)
 
 	w := table.NewWriter()
@@ -172,7 +172,7 @@ func fromSliceMap(v interface{}, ignoreFieldNames ...string) (string, error) {
 	return w.Render(), nil
 }
 
-func fromMap(v interface{}, ignoreFieldNames ...string) (string, error) {
+func fromMap(v any, ignoreFieldNames ...string) (string, error) {
 	t := reflect.TypeOf(v)
 	if t.Kind() != reflect.Map {
 		return "", fmt.Errorf("not map")
@@ -182,7 +182,7 @@ func fromMap(v interface{}, ignoreFieldNames ...string) (string, error) {
 	if value.IsNil() || value.IsZero() {
 		return "", nil
 	}
-	allKeys := make(map[interface{}]struct{})
+	allKeys := make(map[any]struct{})
 	for _, key := range value.MapKeys() {
 		name := fmt.Sprintf("%v", key.Interface())
 		if containsIgnoreCase(ignoreFieldNames, name) {
@@ -219,7 +219,7 @@ func fromMap(v interface{}, ignoreFieldNames ...string) (string, error) {
 	return w.Render(), nil
 }
 
-func fromStruct(v interface{}, ignoreFieldNames ...string) (string, error) {
+func fromStruct(v any, ignoreFieldNames ...string) (string, error) {
 	value := reflect.ValueOf(v)
 	t := value.Type()
 

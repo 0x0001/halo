@@ -24,7 +24,7 @@ func (s *sqliteTestSuite) TestSqlite() {
 	cases := []struct {
 		name string
 		stmt string
-		args []interface{}
+		args []any
 	}{
 		{
 			name: "create table",
@@ -34,7 +34,7 @@ func (s *sqliteTestSuite) TestSqlite() {
 		{
 			name: "insert data",
 			stmt: `INSERT INTO test (name) VALUES (?)`,
-			args: []interface{}{"test1"},
+			args: []any{"test1"},
 		},
 		{
 			name: "select data",
