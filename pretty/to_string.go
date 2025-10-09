@@ -18,11 +18,11 @@ func ToString(v any, ignoreFieldNames ...string) (string, error) {
 		return "<nil>", nil
 	}
 
-	switch v.(type) {
+	switch v := v.(type) {
 	case time.Time:
-		return v.(time.Time).Format(time.RFC3339), nil
+		return v.Format(time.RFC3339), nil
 	case json.RawMessage:
-		return string(v.(json.RawMessage)), nil
+		return string(v), nil
 	}
 
 	t := reflect.TypeOf(v)
